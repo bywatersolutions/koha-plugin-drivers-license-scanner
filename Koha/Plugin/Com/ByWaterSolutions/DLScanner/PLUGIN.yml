@@ -1,0 +1,9 @@
+name: Driver's License Scanner plugin
+author: Kyle M Hall
+date_authored: 2020-06-10
+date_updated: 1900-01-01
+minimum_version: {MINIMUM_VERSION}
+maximum_version:
+version: {VERSION}
+description: A Koha plugin that adds the ability to create HTML DLScanner via the REST API.
+module: Koha::Plugin::Com::ByWaterSolutions::DLScanner
