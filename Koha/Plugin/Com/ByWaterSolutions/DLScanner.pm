@@ -49,8 +49,6 @@ sub intranet_js {
 
     return q|
         <script>
-            console.log("Thanks for testing the kitchen sink plugin!");
-
             $( "#entryform" ).before(`
                 <fieldset class="rows" id="dl-scan">
                     <legend id="dl-scan_lgd">Import address from drivers license</legend>
@@ -68,29 +66,35 @@ sub intranet_js {
                         dlInterval = window.setInterval(function () {
                             let newUpdate = new Date().getTime();
 
-                            console.log(newUpdate - lastUpdate);
                             if ( newUpdate - lastUpdate > 100 ) {
                                 clearInterval(dlInterval);
                                 dlInterval = null;
                                 lastUpdate = null;
+                                console.log($('#dl-data').val());
                                 var lines = $('#dl-data').val().split('\n');
                                 $('#dl-data').val("");
+                                console.log("LINES: " + lines.length );
                                 for( var i = 0 ; i < lines.length ; i++ ){
                                     const line = lines[i];
+                                    console.log( line );
                                     const code = line.substring(0, 3);
                                     const value = line.substring(3);
 
                                     switch(code) {
                                         case 'DAG':
+                                            console.log("Address is " + value);
                                             $('#address').val(value);
                                             break;
                                         case 'DAI':
+                                            console.log("City is " + value);
                                             $('#city').val(value);
                                             break;
                                         case 'DAJ':
+                                            console.log("State is " + value);
                                             $('#state').val(value);
                                             break;
                                         case 'DAK':
+                                            console.log("Zipcode is " + value);
                                             $('#zipcode').val(value);
                                             break;
                                     }
