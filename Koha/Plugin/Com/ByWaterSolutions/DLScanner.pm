@@ -95,7 +95,7 @@ sub intranet_js {
                                             break;
                                         case 'DAK':
                                             console.log("Zipcode is " + value);
-                                            $('#zipcode').val(value);
+                                            $('#zipcode').val(value.slice(0,5));
                                             break;
                                     }
                                 }
