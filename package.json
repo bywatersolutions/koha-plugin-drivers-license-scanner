@@ -5,7 +5,7 @@
   "description": "Koha Driver's License Scanner plugin",
   "devDependencies": {
     "gulp": "^3.9.1",
-    "gulp-cli": "^1.4.0",
+    "gulp-cli": "^2.3.0",
     "gulp-github-release": "^1.1.5",
     "gulp-run": "^1.7.1"
   },
