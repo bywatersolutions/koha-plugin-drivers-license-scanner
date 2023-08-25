@@ -7,7 +7,7 @@ use Modern::Perl;
 use base qw(Koha::Plugins::Base);
 
 ## Here we set our plugin version
-our $VERSION = "1.0.0";
+our $VERSION = "{VERSION}";
 
 our $metadata = {
     name            => 'DLScanner Plugin',
@@ -15,7 +15,7 @@ our $metadata = {
     description     => 'A Koha plugin that adds the ability to create HTML DLScanner via the REST API.',
     date_authored   => '2020-06-10',
     date_updated    => '1900-01-01',
-    minimum_version => '19.05',
+    minimum_version => '22.11',
     maximum_version => undef,
     version         => $VERSION,
 };
