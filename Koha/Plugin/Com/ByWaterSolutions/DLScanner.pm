@@ -97,6 +97,14 @@ sub intranet_js {
                                             console.log("Zipcode is " + value);
                                             $('#zipcode').val(value.slice(0,5));
                                             break;
+                                        case 'DAC':
+                                            console.log("First name is " + value);
+                                            $('#first-name').val(value);
+                                            break;
+                                        case 'DCS':
+                                            console.log("Last name is " + value);
+                                            $('#last-name').val(value);
+                                            break;
                                     }
                                 }
                             }
