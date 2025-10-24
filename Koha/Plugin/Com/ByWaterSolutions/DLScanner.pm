@@ -60,6 +60,16 @@ sub intranet_js {
             $(document).ready(function () {
                 let lastUpdate;
                 let dlInterval;
+
+                // Prevent browser behavior for Ctrl+J and Ctrl+M
+                $("#dl-data").on('keydown', function (e) {
+                    // 74 = J, 77 = M
+                    if ((e.ctrlKey || e.metaKey) && (e.keyCode === 74 || e.keyCode === 77)) {
+                        e.preventDefault(); // Stop browser default
+                        e.stopPropagation(); // Stop bubbling
+                    }
+                });
+
                 $("#dl-data").bind('input propertychange', function(){
                     lastUpdate = new Date().getTime();
                     if ( !dlInterval ) {
