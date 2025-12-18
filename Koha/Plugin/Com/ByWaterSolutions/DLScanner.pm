@@ -142,11 +142,11 @@ $(document).ready(function() {
                 break;
               case 'DAC':
                 console.log("First name is " + value);
-                $('#first-name').val(value);
+                $('#firstname').val(value);
                 break;
               case 'DCS':
                 console.log("Last name is " + value);
-                $('#last-name').val(value);
+                $('#surname').val(value);
                 break;
             }
           }
