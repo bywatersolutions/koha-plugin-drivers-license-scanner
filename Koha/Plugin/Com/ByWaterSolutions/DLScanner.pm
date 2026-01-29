@@ -93,6 +93,29 @@ $(document).ready(function() {
     }
   });
 
+  document.addEventListener('keydown', function(event) {
+      // Check if the Ctrl key is pressed (event.ctrlKey)
+      // and if the key is 'j' or 'J' (event.key === 'j' or event.keyCode === 74 for older methods)
+      if (event.ctrlKey && (event.key === 'j' || event.key === 'J' || event.keyCode === 74)) {
+          event.preventDefault(); // Prevent the default browser action
+          console.log('Ctrl+J was prevented.');
+          // You can add your own custom action here if needed
+      }
+  });
+
+  document.addEventListener('keydown', function(event) {
+    // Check for Ctrl key (Windows/Linux) or Command key (Mac)
+    const isCtrlKey = event.ctrlKey || event.metaKey; 
+    
+    // Check if the key pressed is '6'
+    // event.key is the preferred method for modern browsers
+    if (isCtrlKey && event.key === '6') {
+        event.preventDefault(); // Prevent the default browser action
+        // You can add your own custom logic here
+        console.log('Ctrl+6 was prevented!');
+    }
+  });
+
 
   // Prevent browser behavior for Ctrl+J and Ctrl+M
   $("#dl-data").on('keydown', function(e) {
