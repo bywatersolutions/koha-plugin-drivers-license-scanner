@@ -1,6 +1,6 @@
 {
   "name": "koha-plugin-drivers-license-scanner",
-  "version": "1.0.0",
+  "version": "2.0.0-alpha",
   "description": "Koha Driver's License Scanner plugin",
   "devDependencies": {
     "gulp": "^4.0.2",

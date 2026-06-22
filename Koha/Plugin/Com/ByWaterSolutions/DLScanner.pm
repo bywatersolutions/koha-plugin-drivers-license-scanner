@@ -7,7 +7,7 @@ use Modern::Perl;
 use base qw(Koha::Plugins::Base);
 
 ## Here we set our plugin version
-our $VERSION = "{VERSION}";
+our $VERSION = "2.0.0-alpha";
 
 our $metadata = {
     name            => 'DLScanner Plugin',
