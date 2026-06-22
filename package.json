@@ -9,7 +9,7 @@
   },
   "scripts": {
     "preversion": "sed -i -e \"s/^our \\$VERSION = .*/our \\$VERSION = \\\"$npm_new_version\\\";/\" Koha/Plugin/Com/ByWaterSolutions/KitchenSink.pm; git add -u; rm -f Koha/Plugin/Com/ByWaterSolutions/KitchenSink.pm-e",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node test/run.js",
     "kpz": "node -e \"console.log(process.env.npm_package_name + '-v' + process.env.npm_package_version + '.kpz')\"",
     "print-name": "node -e \"console.log(process.env.npm_package_name)\"",
     "build": "gulp build"
