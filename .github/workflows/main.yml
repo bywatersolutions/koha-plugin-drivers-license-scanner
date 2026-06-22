@@ -65,7 +65,7 @@ jobs:
       run: |
         cd ../koha-testing-docker
         export KTD_HOME=$(pwd)
-        ktd --name dlscanner --wait-ready 120
+        ktd --name dlscanner --wait-ready 300
 
     - name: Run plugin tests
       run: |
