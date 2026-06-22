@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DLScanner manual test harness</title>
+<style>
+  body { font: 14px/1.4 system-ui, sans-serif; margin: 2rem; max-width: 900px; }
+  fieldset { margin-bottom: 1rem; }
+  label { display: inline-block; width: 7rem; }
+  input { width: 22rem; }
+  #log { white-space: pre-wrap; background: #111; color: #ddd; padding: 1rem;
+         border-radius: 6px; max-height: 320px; overflow: auto; }
+  .pass { color: #2e7d32; font-weight: bold; }
+  .fail { color: #c62828; font-weight: bold; }
+  button, select { font-size: 14px; padding: .3rem .5rem; }
+  .note { background: #fff8e1; border: 1px solid #ffe082; padding: .75rem; border-radius: 6px; }
+</style>
+</head>
+<body>
+<h1>DLScanner manual test harness</h1>
+
+<p class="note">
+  <strong>Serve, don't open from disk.</strong> Run
+  <code>python3 -m http.server</code> in the plugin root and open
+  <code>http://localhost:8000/test/harness.html</code> so this page can
+  <code>fetch()</code> the live JavaScript out of <code>DLScanner.pm</code>
+  (single source of truth — no copy to drift).
+</p>
+<p class="note">
+  <strong>About "replay":</strong> synthetic <code>KeyboardEvent</code>s are
+  <em>untrusted</em>, so the browser will <em>not</em> fire its native Ctrl+J /
+  Ctrl+6 shortcuts for them — replay here verifies <strong>field population in a
+  real browser + jQuery</strong> and that the handler calls
+  <code>preventDefault()</code>. Proving Downloads/tab-switch no longer happens
+  requires a <strong>real scanner</strong> (trusted events) against KTD — that's
+  the final confirmation step.
+</p>
+
+<!-- Mock of the patron entry form the plugin attaches to -->
+<form id="entryform">
+  <fieldset>
+    <legend>Mock memberentry.pl fields</legend>
+    <div><label for="firstname">First name</label><input id="firstname"></div>
+    <div><label for="surname">Surname</label><input id="surname"></div>
+    <div><label for="address">Address</label><input id="address"></div>
+    <div><label for="city">City</label><input id="city"></div>
+    <div><label for="state">State</label><input id="state"></div>
+    <div><label for="zipcode">Zipcode</label><input id="zipcode"></div>
+  </fieldset>
+</form>
+
+<fieldset>
+  <legend>Test controls</legend>
+  <select id="fixture"></select>
+  <button id="replay" type="button">Replay scan (keystrokes)</button>
+  <button id="paste" type="button">Run via paste path</button>
+  <button id="clear" type="button">Clear fields</button>
+</fieldset>
+
+<h3>Results</h3>
+<div id="log"></div>
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="./aamva-fixtures.js"></script>
+<script>
+const log = (msg, cls) => {
+  const el = document.getElementById('log');
+  el.innerHTML += (cls ? `<span class="${cls}">${msg}</span>` : msg) + '\n';
+  el.scrollTop = el.scrollHeight;
+};
+
+// Pull the live <script> body out of the plugin source and run it, so the
+// harness tests exactly what ships.
+async function loadPluginJs() {
+  const res = await fetch('../Koha/Plugin/Com/ByWaterSolutions/DLScanner.pm');
+  const pm = await res.text();
+  const js = pm.slice(pm.indexOf('<script>') + 8, pm.indexOf('</script>'));
+  // eslint-disable-next-line no-eval
+  (0, eval)(js);
+  log('Loaded plugin JavaScript from DLScanner.pm', 'pass');
+}
+
+function toKeystrokes(raw) {
+  return [...raw].map((ch) => {
+    if (ch === '\n') return { key: 'j', ctrlKey: true };   // LF  = Ctrl+J
+    if (ch === '\x1e') return { key: '6', ctrlKey: true };  // RS  = Ctrl+6
+    if (ch === '\r') return { key: 'Enter' };               // CR  = Enter
+    return { key: ch };
+  });
+}
+
+function clearFields() {
+  ['firstname', 'surname', 'address', 'city', 'state', 'zipcode']
+    .forEach((id) => { document.getElementById(id).value = ''; });
+}
+
+function checkFields(expect) {
+  let ok = true;
+  for (const [k, want] of Object.entries(expect)) {
+    const got = document.getElementById(k === 'zipcode' ? 'zipcode' : k).value;
+    const good = got === want;
+    ok = ok && good;
+    log(`  ${good ? '✓' : '✗'} ${k}: got ${JSON.stringify(got)} want ${JSON.stringify(want)}`,
+        good ? 'pass' : 'fail');
+  }
+  log(ok ? 'FIELDS OK' : 'FIELDS MISMATCH', ok ? 'pass' : 'fail');
+}
+
+function replay(fx) {
+  clearFields();
+  log('\n--- replay: ' + fx.name + ' ---');
+  let t = performance.now();
+  for (const ks of toKeystrokes(fx.raw)) {
+    t += 2;
+    document.dispatchEvent(new KeyboardEvent('keydown', {
+      key: ks.key, ctrlKey: !!ks.ctrlKey, bubbles: true, cancelable: true,
+    }));
+  }
+  // idle timer in the handler (250ms) fires processScan; check after that.
+  setTimeout(() => checkFields(fx.expect), 400);
+}
+
+function viaPaste(fx) {
+  clearFields();
+  log('\n--- paste: ' + fx.name + ' ---');
+  const dl = document.getElementById('dl-data');
+  if (!dl) { log('no #dl-data element found', 'fail'); return; }
+  const dt = new DataTransfer();
+  dt.setData('text', fx.raw);
+  dl.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+  setTimeout(() => checkFields(fx.expect), 100);
+}
+
+window.addEventListener('DOMContentLoaded', async () => {
+  const sel = document.getElementById('fixture');
+  FIXTURES.forEach((fx, i) => {
+    const o = document.createElement('option');
+    o.value = i; o.textContent = fx.name; sel.appendChild(o);
+  });
+  await loadPluginJs();
+  document.getElementById('replay').onclick = () => replay(FIXTURES[sel.value]);
+  document.getElementById('paste').onclick = () => viaPaste(FIXTURES[sel.value]);
+  document.getElementById('clear').onclick = clearFields;
+});
+</script>
+</body>
+</html>
