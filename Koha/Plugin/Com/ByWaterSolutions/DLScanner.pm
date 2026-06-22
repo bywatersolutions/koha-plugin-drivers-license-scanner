@@ -58,128 +58,134 @@ $("#entryform").before(`
             `);
 
 $(document).ready(function() {
-  let lastUpdate;
-  let dlInterval;
-
-
   const dlData = document.getElementById('dl-data');
 
-  // --- Always keep focus on the textarea ---
-  window.addEventListener('load', () => dlData.focus());
-  window.addEventListener('blur', () => dlData.focus());
+  // Focus the scan box on load as a convenience. Capture does NOT depend on
+  // focus - the handler below listens at the document level.
+  if (dlData) dlData.focus();
 
-  // --- Clean up non-printable characters (prevents Windows hotkeys) ---
-  dlData.addEventListener('input', e => {
-    // Keep only printable ASCII and newlines
-    e.target.value = e.target.value.replace(/[^\x20-\x7E\r\n]/g, '');
-  });
+  // ----- Scanner burst capture -------------------------------------------
+  //
+  // A keyboard-wedge license scanner "types" the decoded AAMVA data as a fast
+  // burst of keystrokes. That data is full of ASCII control characters used as
+  // separators: LF (0x0A) between elements, RS (0x1E) after the header, CR
+  // (0x0D) terminating segments. The scanner emits these as control-key chords
+  // - LF = Ctrl+J, RS = Ctrl+6, CR = Enter - and left alone the browser acts on
+  // them ( Ctrl+J opens Downloads, Ctrl+6 switches tabs ), which steals focus
+  // and corrupts the capture.
+  //
+  // So we watch at the document level ( works no matter which field has focus ),
+  // arm on the AAMVA start sentinel '@', and once a scanner-fast follow-up
+  // keystroke confirms it isn't a human typing '@', we swallow every keystroke
+  // in the burst and rebuild the raw string ourselves - turning the control
+  // chords back into the real control characters the parser needs - then parse
+  // when the burst goes quiet.
 
-  // --- Optional: Capture and process scan when Enter is pressed ---
-  let buffer = '';
-  document.addEventListener('keydown', e => {
-    // Ignore modifier keys (Shift, Alt, Ctrl, etc.)
-    if (e.key.length === 1) buffer += e.key;
+  const BURST_MS = 50;   // max gap that still counts as scanner-fast
+  const IDLE_MS  = 250;  // quiet period that marks the end of a scan
 
-    // When Enter is pressed, assume scan complete
-    if (e.key === 'Enter') {
-      e.preventDefault(); // Prevent form submission or browser actions
-      console.log('Raw license data:', buffer);
+  let capturing = false;
+  let armed     = false;
+  let armTime   = 0;
+  let buffer    = '';
+  let idleTimer = null;
 
-      // Fill the textarea with clean data
-      dlData.value = buffer.replace(/[^\x20-\x7E\r\n]/g, '');
-
-      // Reset buffer for next scan
-      buffer = '';
+  // Turn a keydown into the character the scanner meant to send.
+  function reconstruct(e) {
+    if (e.ctrlKey && /^[a-zA-Z]$/.test(e.key)) {
+      // Ctrl+letter -> ASCII control char ( Ctrl+J -> 0x0A, Ctrl+M -> 0x0D )
+      return String.fromCharCode(e.key.toUpperCase().charCodeAt(0) - 64);
     }
-  });
+    if (e.key === 'Enter') return '\n';
+    if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) return e.key;
+    return ''; // modifiers, Ctrl+6 ( RS ), function/arrow keys -> drop
+  }
 
-  document.addEventListener('keydown', function(event) {
-      // Check if the Ctrl key is pressed (event.ctrlKey)
-      // and if the key is 'j' or 'J' (event.key === 'j' or event.keyCode === 74 for older methods)
-      if (event.ctrlKey && (event.key === 'j' || event.key === 'J' || event.keyCode === 74)) {
-          event.preventDefault(); // Prevent the default browser action
-          console.log('Ctrl+J was prevented.');
-          // You can add your own custom action here if needed
-      }
-  });
+  function endScan() {
+    const raw = buffer;
+    capturing = false;
+    armed     = false;
+    buffer    = '';
+    if (dlData) dlData.value = '';
+    processScan(raw);
+  }
 
-  document.addEventListener('keydown', function(event) {
-    // Check for Ctrl key (Windows/Linux) or Command key (Mac)
-    const isCtrlKey = event.ctrlKey || event.metaKey; 
-    
-    // Check if the key pressed is '6'
-    // event.key is the preferred method for modern browsers
-    if (isCtrlKey && event.key === '6') {
-        event.preventDefault(); // Prevent the default browser action
-        // You can add your own custom logic here
-        console.log('Ctrl+6 was prevented!');
-    }
-  });
+  function bumpIdleTimer() {
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(endScan, IDLE_MS);
+  }
 
+  // Capture phase so we run before the browser's shortcut handling.
+  document.addEventListener('keydown', function(e) {
+    const now = e.timeStamp;
 
-  // Prevent browser behavior for Ctrl+J and Ctrl+M
-  $("#dl-data").on('keydown', function(e) {
-    // 74 = J, 77 = M
-    if ((e.ctrlKey || e.metaKey) && (e.keyCode === 74 || e.keyCode === 77)) {
-      e.preventDefault(); // Stop browser default
-      e.stopPropagation(); // Stop bubbling
-    }
-  });
-
-  $("#dl-data").bind('input propertychange', function() {
-    lastUpdate = new Date().getTime();
-    if (!dlInterval) {
-      dlInterval = window.setInterval(function() {
-        let newUpdate = new Date().getTime();
-
-        if (newUpdate - lastUpdate > 100) {
-          clearInterval(dlInterval);
-          dlInterval = null;
-          lastUpdate = null;
-          console.log($('#dl-data').val());
-          var lines = $('#dl-data').val().split('\n');
-          $('#dl-data').val("");
-          console.log("LINES: " + lines.length);
-          for (var i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            console.log(line);
-            const code = line.substring(0, 3);
-            const value = line.substring(3);
-
-            switch (code) {
-              case 'DAG':
-                console.log("Address is " + value);
-                $('#address').val(value);
-                break;
-              case 'DAI':
-                console.log("City is " + value);
-                $('#city').val(value);
-                break;
-              case 'DAJ':
-                console.log("State is " + value);
-                $('#state').val(value);
-                break;
-              case 'DAK':
-                console.log("Zipcode is " + value);
-                $('#zipcode').val(value.slice(0, 5));
-                break;
-              case 'DAC':
-                console.log("First name is " + value);
-                $('#firstname').val(value);
-                break;
-              case 'DCS':
-                console.log("Last name is " + value);
-                $('#surname').val(value);
-                break;
-            }
-          }
+    if (!capturing) {
+      if (armed) {
+        armed = false;
+        // A scanner-fast key right after '@' confirms a scan; capture this
+        // keystroke too. A slow key means a human typed '@', so do nothing.
+        if (now - armTime < BURST_MS) {
+          capturing = true;
         }
-      }, 10);
+      }
+      if (!capturing) {
+        // Not in a scan. Arm on '@' but let it through ( might be a human ).
+        if (e.key === '@') { armed = true; armTime = now; buffer = '@'; }
+        return;
+      }
     }
-  });
+
+    // Capturing: stop the browser/Koha from acting on the scan keystrokes.
+    e.preventDefault();
+    e.stopPropagation();
+
+    buffer += reconstruct(e);
+    if (dlData) dlData.value = buffer.replace(/[^\x20-\x7E]/g, '');
+    bumpIdleTimer();
+  }, true);
+
+  // Paste support - lets staff paste a saved scan ( the .txt from a scan into
+  // Notepad ) for testing without the physical scanner.
+  if (dlData) {
+    dlData.addEventListener('paste', function(e) {
+      e.preventDefault();
+      const text = (e.clipboardData || window.clipboardData).getData('text');
+      dlData.value = '';
+      processScan(text);
+    });
+  }
+
+  // Map a parsed license onto the patron entry form.
+  function processScan(raw) {
+    if (!raw || raw.indexOf('@') === -1) return;
+
+    let result;
+    try {
+      result = parse(raw);
+    } catch (err) {
+      console.log('DLScanner: could not parse license data', err, raw);
+      return;
+    }
+    if (!result) {
+      console.log('DLScanner: no result from parser', raw);
+      return;
+    }
+
+    if (result.address)     $('#address').val(result.address);
+    if (result.city)        $('#city').val(result.city);
+    if (result.state)       $('#state').val(result.state);
+    if (result.postal_code) $('#zipcode').val(String(result.postal_code).slice(0, 5));
+    if (result.name) {
+      if (result.name.first) $('#firstname').val(result.name.first);
+      if (result.name.last)  $('#surname').val(result.name.last);
+    }
+  }
 });
 
 
+// The AAMVA parsing below ( parse / pdf417 / stripe / parseDate ) is derived
+// from winfinit/aamvajs ( https://github.com/winfinit/aamvajs ), which is
+// distributed under the BSD-3-Clause license. Copyright (c) winfinit.
 var parse = function(data) {
   data = data.replace(/\n/, "");
   // replace spaces with regular space
@@ -541,7 +547,15 @@ var pdf417 = function(data) {
       break;
     }
     case 8:
-    case 9: {
+    case 9:
+    case 10:
+    case 11:
+    default: {
+      // Versions 8+ ( 2013 onward, including v10/2020 and v11/2025 ) keep the
+      // same element structure, so build the regex dynamically from whichever
+      // known element IDs are present, in the order they appear. This is also
+      // the fallback for any unrecognized version so future revisions still
+      // parse instead of returning nothing.
       var prefixes = [
         'DCA', // jurisdiction vehicle class
         'DCB', // jurisdiction restriction codes
@@ -613,10 +627,6 @@ var pdf417 = function(data) {
 
       parseRegex = new RegExp(regExStr);
       break;
-    }
-    default: {
-      console.log('unable to get version', version);
-      // probably not a right parse...
     }
   }
 
